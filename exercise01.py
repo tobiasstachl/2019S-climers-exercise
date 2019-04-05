@@ -1,3 +1,6 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+
 """
 120.081 Climate and Environmental Remote Sensing (VU, 2018S) 
 Exercise 1: Climate trends and variability
@@ -17,6 +20,8 @@ import pandas as pd
 import numpy as np
 import os
 import matplotlib.pyplot as plt
+from pandas.plotting import register_matplotlib_converters
+register_matplotlib_converters()
 import statsmodels.api as sm
 from scipy import stats
 
@@ -63,53 +68,71 @@ def plot_sealevel(fn_sealevel, outpath):
 
     # read sealevel data
     data = read_data(infile=fn_sealevel, parse_col='Time', date_str='%Y-%m-%d')
-    print(data.describe())
+    data = data.drop(['Time', 'Year', 'Month'], axis=1)
+    print(data.columns)
 
     # plot the data
-    plt.figure()
+    plt.figure(figsize=(12,5))
     columns = ['Glob', 'NHem', 'SHem']
     plt.plot(data[columns])
     plt.title("Global sea-level anomalies")
     plt.ylabel("Sea level anomaly (m)")
     plt.grid(True)
     plt.legend(columns)
-    plt.savefig(os.path.join(outpath, 'ex1_sealevel-ts.png'))
+    plt.savefig(os.path.join(outpath, 'ex1_sealevel-global-anomalies-ts.png'))
+
+    # plot the data
+    plt.figure(figsize=(12,5))
+    columns_zonal = ['b24N.90N', 'b24S.24N', 'b90S.24S', 'b64N.90N', 'b44N.64N', 'b24N.44N',
+                     'bEQU.24N', 'b24S.EQU','b44S.24S', 'b64S.44S', 'b90S.64S', 'Nino34']
+    plt.plot(data[columns_zonal])
+    plt.title("Latitudinal band sea-level anomalies")
+    plt.ylabel("Sea level anomaly (m)")
+    plt.grid(True)
+    plt.legend(columns_zonal)
+    plt.savefig(os.path.join(outpath, 'ex1_sealevel-zonal-anomalies-ts.png'))
 
     # aggregate to annual data
     data_annual = data.resample('A').mean()
 
-    # compute trend based on ordinary least square regression
-    y = data_annual["Glob"]
-    x = list(range(1, len(data_annual) + 1))
-    x = np.reshape(x, (-1, 1))
-    x = sm.add_constant(x)  # to add intercept
-    trd = sm.OLS(y, x).fit()  # fit regression
-    data_annual["Glob_trd_ols"] = trd.predict(x)  # compute trend line
-    print(trd.summary())
+    for col in data_annual.columns:
 
-    # compute trend based on Theil-Sen slope
-    y = data_annual["Glob"]
-    theilsen_results = theilsen(y, alpha=0.95)
-    x = data_annual.index.to_julian_date() # list(range(1, len(data_annual) + 1))
-    data_annual['Glob_trdmed'] = theilsen_results['median_interc'] + theilsen_results['median_slope'] * x
-    data_annual['Glob_trdlow'] = theilsen_results['lower_CI_interc'] + theilsen_results['lower_CI_slope'] * x
-    data_annual['Glob_trdupp'] = theilsen_results['upper_CI_interc'] + theilsen_results['upper_CI_slope'] * x
+        # 1) compute trend based on ordinary least square regression
+        y = data_annual[col]
+        x = list(range(1, len(data_annual) + 1))
+        x = np.reshape(x, (-1, 1))
+        x = sm.add_constant(x)  # to add intercept
+        trd = sm.OLS(y, x).fit()  # fit regression
+        data_annual["{}_trd_ols".format(col)] = trd.predict(x)  # compute trend line
+        print(trd.summary())
 
-    # compare trends
-    plt.figure()
-    data_annual.Glob.plot(color="black", label='Sea-level anomaly')
-    data_annual.Glob_trd_ols.plot(color="red", label='OLS trend')
-    data_annual.Glob_trdmed.plot(color="blue", label='Theil-Slope median trend')
-    data_annual.Glob_trdlow.plot(
-        color="blue", linestyle='dashed', label='Confidence interval')
-    data_annual.Glob_trdupp.plot(
-        color="blue", linestyle='dashed', label='Confidence interval')
-    plt.title("Global sea-level anomalies")
-    plt.ylabel("Sea level anomaly (m)")
-    plt.grid(True)
-    plt.legend()
-    plt.savefig(os.path.join(outpath, 'ex1_sealevel-trend.png'))
-    plt.close()
+        # compute trend based on Theil-Sen slope
+        y = data_annual[col]
+        theilsen_results = theilsen(y, alpha=0.95)
+        x = data_annual.index.to_julian_date() # list(range(1, len(data_annual) + 1))
+        data_annual['{}_trdmed'.format(col)] = theilsen_results['median_interc'] + theilsen_results['median_slope'] * x
+        data_annual['{}_trdlow'.format(col)] = theilsen_results['lower_CI_interc'] + theilsen_results['lower_CI_slope'] * x
+        data_annual['{}_trdupp'.format(col)] = theilsen_results['upper_CI_interc'] + theilsen_results['upper_CI_slope'] * x
+
+        # compare trends
+        plt.figure()
+        data_annual[col].plot(color="black", label='Sea-level anomaly')
+        data_annual["{}_trd_ols".format(col)].plot(color="red", label='OLS trend')
+        data_annual['{}_trdmed'.format(col)].plot(color="blue", label='Theil-Slope median trend')
+        data_annual['{}_trdlow'.format(col)].plot(
+            color="blue", linestyle='dashed', label='Lower CI')
+        data_annual['{}_trdupp'.format(col)].plot(
+            color="blue", linestyle='dashed', label='Upper CI')
+        plt.title("Sea-level anomalies and trends: {}".format(col))
+        plt.ylabel("Sea level anomaly (m)")
+
+        plt.ylim(-0.05, 0.08)
+        if col == 'Nino34':
+            plt.ylim(-0.08, 0.2)
+        plt.grid(True)
+        plt.legend(loc='upper left')
+        plt.savefig(os.path.join(outpath, 'ex1_sealevel_trend_{}.png'.format(col)))
+        plt.close()
 
 
 def theilsen(s, alpha=0.95):
@@ -194,9 +217,11 @@ if __name__ == '__main__':
     # run the individual analyses
     plot_sealevel(fn_sealevel, outpath)
 
-    trend_analysis(fn_sealevel, fn_temp, fn_soi, outpath)
+    #trend_analysis(fn_sealevel, fn_temp, fn_soi, outpath)
 
     # insert here the code for your own analysis ...
+
+    #plt.show()
 
 
 
