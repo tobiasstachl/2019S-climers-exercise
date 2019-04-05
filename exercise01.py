@@ -150,7 +150,7 @@ def plot_sealevel(fn_sealevel, outpath):
 
 def plot_sst(fn_temp, outpath):
     """
-    Visualize sealevel data and trends.
+    Visualize temperature data and trends.
 
     Parameters
     ----------
@@ -167,12 +167,12 @@ def plot_sst(fn_temp, outpath):
 
     # read sealevel data
     data = read_data(infile=fn_temp, parse_col='Year', date_str='%Y')
-    data = data.drop(['Year'], axis=1)
+    # data = data.drop(['Year'], axis=1)
     print(data.columns)
 
     # plot the data
     plt.figure(figsize=(12,5))
-    columns = ['Glob', 'NHem', 'SHem']
+    columns = ['Glob']
     plt.plot(data[columns])
     sns.despine()
     plt.title("Global SST anomalies")
@@ -324,7 +324,7 @@ if __name__ == '__main__':
     # run the individual analyses
 
     # Analysis 1a: Trends in sea level anomalies
-    plot_sealevel(fn_sealevel, os.path.join(outpath, 'sealevel'))
+    # plot_sealevel(fn_sealevel, os.path.join(outpath, 'sealevel'))
 
     # Analysis 1b: Trends in surface temperature anomalies
     plot_sst(fn_temp, os.path.join(outpath, 'temperature'))
