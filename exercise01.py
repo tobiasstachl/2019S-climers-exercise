@@ -148,6 +148,30 @@ def plot_sealevel(fn_sealevel, outpath):
         plt.savefig(os.path.join(outpath, 'ex1_sealevel_trend_{}.png'.format(col)))
         plt.close()
 
+
+def plot_sst_taskb(fn_temp, outpath, start=1880):
+    try:
+        os.makedirs(outpath)
+    except FileExistsError:
+        pass
+
+    # read sealevel data
+    data = read_data(infile=fn_temp, parse_col='Year', date_str='%Y')
+    end = start + 15
+    mask = (data['Year'] >= str(start)) & (data['Year'] <= str(end))
+    data_temp = data.loc[mask]
+
+    # plot the data
+    plt.figure()
+    plt.plot(data_temp['Glob'])
+    sns.despine()
+    plt.title("Global SST anomalies. {}-{}".format(start, end), fontweight='bold')
+    plt.ylabel("SST anomaly (°C)")
+    plt.grid(color='grey', linestyle='--', linewidth=0.5)
+    plt.tight_layout()
+    plt.savefig(os.path.join(outpath, 'ex1_sst-global-anomalies-{}-{}.png'.format(start, end)))
+
+
 def plot_sst(fn_temp, outpath):
     """
     Visualize temperature data and trends.
@@ -168,7 +192,7 @@ def plot_sst(fn_temp, outpath):
     # read sealevel data
     data = read_data(infile=fn_temp, parse_col='Year', date_str='%Y')
     # data = data.drop(['Year'], axis=1)
-    print(data.columns)
+    # print(data.columns)
 
     # plot the data
     plt.figure(figsize=(12,5))
@@ -184,8 +208,8 @@ def plot_sst(fn_temp, outpath):
 
     # plot the data
     plt.figure(figsize=(12,5))
-    columns_zonal = ['24N-90N', '24S-24N', '90S-24S', '64N-90N','44N-64N',
-                     '24N-44N', 'EQU-24N', '24S-EQU', '44S-24S', '64S-44S','90S-64S']
+    columns_zonal = ['24N-90N', '24S-24N', '90S-24S', '64N-90N', '44N-64N',
+                     '24N-44N', 'EQU-24N', '24S-EQU', '44S-24S', '64S-44S', '90S-64S']
     plt.plot(data[columns_zonal])
     sns.despine()
     plt.title("Latitudinal band SST anomalies")
@@ -194,7 +218,6 @@ def plot_sst(fn_temp, outpath):
     plt.legend(columns_zonal, bbox_to_anchor=(1.01, 0.5), loc="center left")
     plt.tight_layout()
     plt.savefig(os.path.join(outpath, 'ex1_sst-zonal-anomalies-ts.png'))
-
 
     # aggregate to annual data
     data_annual = data.resample('A').mean()
@@ -327,9 +350,10 @@ if __name__ == '__main__':
     # plot_sealevel(fn_sealevel, os.path.join(outpath, 'sealevel'))
 
     # Analysis 1b: Trends in surface temperature anomalies
-    plot_sst(fn_temp, os.path.join(outpath, 'temperature'))
+    # plot_sst(fn_temp, os.path.join(outpath, 'temperature'))
+    plot_sst_taskb(fn_temp, os.path.join(outpath, 'taskb-temp'), 1990)
 
-    #trend_analysis(fn_sealevel, fn_temp, fn_soi, outpath)
+    # trend_analysis(fn_sealevel, fn_temp, fn_soi, outpath)
 
     # insert here the code for your own analysis ...
 
