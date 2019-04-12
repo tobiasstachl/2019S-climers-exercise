@@ -158,6 +158,7 @@ def plot_sst_taskb(fn_temp, outpath, start=1880):
     # read sealevel data
     data = read_data(infile=fn_temp, parse_col='Year', date_str='%Y')
     end = start + 15
+    end = 2018 if end > 2018 else end
     mask = (data['Year'] >= str(start)) & (data['Year'] <= str(end))
     data_temp = data.loc[mask]
 
