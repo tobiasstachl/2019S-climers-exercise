@@ -170,6 +170,7 @@ def plot_surf_temp(fn_temp, outpath):
     """
     Visualize global surface temperature data and trends.
 
+
     Parameters
     ----------
     fn_temp : str
@@ -190,6 +191,7 @@ def plot_surf_temp(fn_temp, outpath):
     # plot global data
     plt.figure(figsize=(12, 5))
     columns = ['Glob', 'NHem', 'SHem']
+
     plt.plot(data[columns])
     sns.despine()
     plt.title("Global surface temperature anomalies", fontweight='bold')
@@ -286,9 +288,66 @@ def theilsen(s, alpha=0.95):
     return trd
 
 
-def trend_analysis(fn_sealevel, fn_temp, fn_soi, outpath):
+def plots_taskb(fn_temp, outpath):
+    try:
+        os.makedirs(outpath)
+    except FileExistsError:
+        pass
+
+    # read sealevel data
+    data = read_data(infile=fn_temp, parse_col='Year', date_str='%Y')
+    print(data.columns)
+
+    # select zone
+    for zone in ['Glob', 'NHem', 'SHem', '24N-90N', '24S-24N', '90S-24S',
+       '64N-90N', '44N-64N', '24N-44N', 'EQU-24N', '24S-EQU', '44S-24S',
+       '64S-44S', '90S-64S']:
+        #col = 'Glob'
+
+        # plot temperature anomalies from 1970 onwards
+        plt.figure(figsize=(10,4))
+        plt.plot(data[zone]['01-01-1970':], linestyle='--')
+
+        # compute trends in loop and plot
+        for period in [(1990, 2005), (1998, 2014), (1998, 2012), (2003, 2018)]:
+            start, end = period
+            end = 2018 if end > 2018 else end
+            mask = (data['Year'] >= str(start)) & (data['Year'] <= str(end))
+            data_temp_masked = data.loc[mask]
+            print(data_temp_masked)
+
+            y = data_temp_masked[zone]
+
+            x = list(range(1, len(data_temp_masked) + 1))
+            x = np.reshape(x, (-1, 1))
+            x = sm.add_constant(x)  # to add intercept
+            trd = sm.OLS(y, x).fit()  # fit regression
+            data_temp_masked["{}_trd_ols".format(zone)] = trd.predict(x)  # compute trend line
+            print(trd.summary())
+            print(trd.params['x1'])
+
+            # plot trends
+            (data_temp_masked["{}_trd_ols".format(zone)]
+             .plot(label=r'OLS for {}-{} ($slope={:.3f}, p={:.3f}$)'.format(start,
+                                                                  end,
+                                                                  trd.params['x1'],
+                                                                  trd.pvalues['x1']),
+             linewidth=2, linestyle='-'))
+
+        sns.despine()
+        plt.title("{} Surface temperature anomalies (Base period 1951-1980)".format(zone))
+        plt.ylabel("Temperature anomaly (°C)")
+        plt.grid(color='grey', linestyle='--', linewidth=0.5, axis='both')
+        plt.tight_layout()
+        plt.legend()
+
+        #plt.show()
+        plt.savefig(os.path.join(outpath, 'ex1-{}-warming-pause.png'.format(zone)), dpi=150)
+
+
+def task_c(fn_sealevel, fn_temp, fn_soi, outpath):
     """
-    PART 1: Global trends in sea-level and temperature: Here starts your own analysis!
+    Task C
 
     Parameters
     ----------
@@ -301,31 +360,41 @@ def trend_analysis(fn_sealevel, fn_temp, fn_soi, outpath):
     outpath : str
         Name of output directory.
     """
-    
+
     # read data
     sealevel = read_data(infile=fn_sealevel, parse_col='Time', date_str='%Y-%m-%d')
+    sealevel = sealevel.drop(['Time', 'Year', 'Month'], axis=1)
+
     temp = read_data(infile=fn_temp, parse_col='Year', date_str='%Y')
+    temp = temp.drop(['Year'], axis=1)
+
     soi = read_data(infile=fn_soi, parse_col='Date', date_str='%Y%m')
+    soi = soi['Value'].rename('SOI')
+
+    print(sealevel.head())
+    print(temp.head())
 
     # compute trends for sea-level data
     # ----------------------------------
 
     # aggregate to annual data
+    """
     sealevel_annual = sealevel.resample('A').mean()
 
     # compute Theil-Sen slopes for all regions
     trd = sealevel_annual.apply(theilsen, alpha=0.95)
     trd.to_csv(os.path.join(outpath,
                             'ESACCI-SEALEVEL-L4-MSLA-MERGED-1993-2015-fv02_trends.csv'))
+    """
+
+    print(soi.head())
+    soi.plot()
+    plt.show()
 
     # insert here the code for your own analysis ...
-
+    return None
 
 if __name__ == '__main__':
-    """
-    run the analyses for exercise 1
-    """
-
     # Gets the directory where this python script is located,
     # which is assumed to be in "CLIMERS_ex01" with subdirectory "data"
     inpath = os.path.dirname(os.path.realpath(__file__))
@@ -340,22 +409,31 @@ if __name__ == '__main__':
     fn_soi = os.path.join(inpath, 'data', 'NOAA-NCDC-SOI',
                           'noaa_ncdc_soi_data.csv')
 
-
-    # run the individual analyses
-
-    # Analysis 1a: Trends in sea level anomalies
+    #---------------------------------------------------------------------------
+    # Analysis A.1.: Trends in sea level anomalies
+    # --------------------------------------------------------------------------
     # plot_sealevel(fn_sealevel, os.path.join(outpath, 'sealevel'))
 
-    # Analysis 1b: Trends in surface temperature anomalies
-    plot_surf_temp(fn_temp, os.path.join(outpath, 'temperature'))
+    # --------------------------------------------------------------------------
+    # Analysis A.2.: Trends in surface temperature anomalies
+    # --------------------------------------------------------------------------
+    # plot_sst(fn_temp, os.path.join(outpath, 'temperature'))
 
-    # trend_analysis(fn_sealevel, fn_temp, fn_soi, outpath)
+    # --------------------------------------------------------------------------
+    # Analysis B: Global warming hiatus 1998-2012/2014
+    # --------------------------------------------------------------------------
+    # plots_taskb(fn_temp, os.path.join(outpath, 'taskb-warming-hiatus'), 1998)
 
-    # insert here the code for your own analysis ...
-
-    #plt.show()
-
-
+    # --------------------------------------------------------------------------
+    # Analysis C: El Nino and climate variability
+    # --------------------------------------------------------------------------
+    # What to expect:
+    #    1) significant correlation between SOI time series
+    #       and Surface Temperature/Sea level anomalies over eastern pacific
+    #    2) similar trend in SOI, SST and Sea level over eastern pacific
+    #    3) at the global scale?
+    # --------------------------------------------------------------------------
+    task_c(fn_sealevel, fn_temp, fn_soi, outpath)
 
 
 
