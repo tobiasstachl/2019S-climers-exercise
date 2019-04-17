@@ -328,10 +328,10 @@ def plots_taskb(fn_temp, outpath):
 
             # plot trends
             (data_temp_masked["{}_trd_ols".format(zone)]
-             .plot(label=r'OLS for {}-{} ($slope={:.3f}, p={:.3f}$)'.format(start,
-                                                                  end,
-                                                                  trd.params['x1'],
-                                                                  trd.pvalues['x1']),
+             .plot(label=r'OLS for {}-{} ($slope={:.3f}, {}$)'.format(start,
+                                                                      end,
+                                                                      trd.params['x1'],
+                                                                      label_pval(trd.pvalues['x1'])),
              linewidth=2, linestyle='-'))
 
         sns.despine()
@@ -422,7 +422,7 @@ if __name__ == '__main__':
     # --------------------------------------------------------------------------
     # Analysis B: Global warming hiatus 1998-2012/2014
     # --------------------------------------------------------------------------
-    # plots_taskb(fn_temp, os.path.join(outpath, 'taskb-warming-hiatus'), 1998)
+    # plots_taskb(fn_temp, os.path.join(outpath, 'taskb-warming-hiatus'))
 
     # --------------------------------------------------------------------------
     # Analysis C: El Nino and climate variability
