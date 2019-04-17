@@ -264,6 +264,15 @@ def plot_surf_temp(fn_temp, outpath):
         plt.close()
 
 
+def detrend(s):
+    y = s.values
+    x = list(range(1, len(s) + 1))
+    x = np.reshape(x, (-1, 1))
+    x = sm.add_constant(x)  # to add intercept
+    trd = sm.OLS(y, x).fit()  # fit regression
+    trend = trd.predict(x)  # compute trend line
+    return pd.Series(data=(y-trend), index=s.index)
+
 def theilsen(s, alpha=0.95):
     """
     Function to compute Theil-Sen slopes.
@@ -360,6 +369,10 @@ def task_c(fn_sealevel, fn_temp, fn_soi, outpath):
     outpath : str
         Name of output directory.
     """
+    try:
+        os.makedirs(outpath)
+    except FileExistsError:
+        pass
 
     # read data
     sealevel = read_data(infile=fn_sealevel, parse_col='Time', date_str='%Y-%m-%d')
@@ -370,29 +383,77 @@ def task_c(fn_sealevel, fn_temp, fn_soi, outpath):
 
     soi = read_data(infile=fn_soi, parse_col='Date', date_str='%Y%m')
     soi = soi['Value'].rename('SOI')
-
-    print(sealevel.head())
-    print(temp.head())
+    soi = pd.DataFrame(soi)
 
     # compute trends for sea-level data
     # ----------------------------------
 
-    # aggregate to annual data
-    """
-    sealevel_annual = sealevel.resample('A').mean()
+    # aggregate to annual data centered at the last day of the year
+    sealevel_annual = sealevel.resample('A').mean() # was M
+    temp_annual = temp.resample('A').mean() # was AS
+    soi_annual = soi.resample('A').mean() # was M
 
-    # compute Theil-Sen slopes for all regions
-    trd = sealevel_annual.apply(theilsen, alpha=0.95)
-    trd.to_csv(os.path.join(outpath,
-                            'ESACCI-SEALEVEL-L4-MSLA-MERGED-1993-2015-fv02_trends.csv'))
-    """
 
-    print(soi.head())
-    soi.plot()
-    plt.show()
+    # rename matching zons with slightly different column names to match amongst each other
+    sealevel_annual_nino34 = sealevel_annual['Nino34']
+    sealevel_annual = sealevel_annual.drop(['Nino34'], axis=1)
+    sealevel_annual.columns = temp_annual.columns.values
+    sealevel_annual['Nino34'] = sealevel_annual_nino34
 
-    # insert here the code for your own analysis ...
-    return None
+    # ------------------------------------------------------------------------------------
+    # Experiment A: annual data within common date range of all 3 data sets (1993-2015)
+    # ------------------------------------------------------------------------------------
+    # 1) cut two-fold combinations to same range
+    sealevel_annual_1993_2015 = sealevel_annual['1993-01-01':'2015-12-31']
+    soi_annual_1993_2015 = soi_annual['1993-01-01':'2015-12-31']
+
+    soi_annual_1951_2018 = soi_annual['1951-01-01':'2018-12-31']
+    temp_annual_1951_2018 = temp_annual['1951-01-01':'2018-12-31']
+
+    # 2) de-trend sea level and temperature anomalies
+    sealevel_annual_1993_2015_detrended = sealevel_annual_1993_2015.apply(detrend)
+    temp_annual_1951_2018_detrended = temp_annual_1951_2018.apply(detrend)
+    # ------------------------------------------------------------------------------------
+    # 4a) compute correlations of sea level with SOI
+    # ------------------------------------------------------------------------------------
+    merged_soi_sealevel = pd.concat([soi_annual_1993_2015, sealevel_annual_1993_2015_detrended], axis=1)
+    corr_soi_sealevel = merged_soi_sealevel.corr()
+
+    # create triangular mask for heatmap
+    mask = np.zeros_like(corr_soi_sealevel)
+    mask[np.triu_indices_from(mask)] = True
+
+    # plot heatmap of pairwise correlations
+    f, ax = plt.subplots(figsize=(8, 8))
+
+    # define correct cbar height and pass to sns.heatmap function
+    cbar_kws = {"fraction": 0.046, "pad": 0.04}
+    sns.heatmap(corr_soi_sealevel, mask=mask, cmap='coolwarm_r', square=True, vmin=-1, vmax=1, annot=True, cbar_kws=cbar_kws, ax=ax)
+    plt.title("Correlation between annual SOI and annual average sea level over different zones (Period 1993-2015)")
+    plt.tight_layout()
+    plt.savefig(os.path.join(outpath, 'ex3_heatmap_SOI_sealevel_detrended.png'), dpi=150)
+    # ------------------------------------------------------------------------------------
+    # 4b) compute correlations of surface temperature with SOI
+    # ------------------------------------------------------------------------------------
+    merged_soi_surftemp = pd.concat([soi_annual_1951_2018, temp_annual_1951_2018_detrended], axis=1)
+    corr_soi_surftemp = merged_soi_surftemp.corr()
+
+    # create triangular mask for heatmap
+    mask = np.zeros_like(corr_soi_surftemp)
+    mask[np.triu_indices_from(mask)] = True
+
+    # plot heatmap of pairwise correlations
+    f, ax = plt.subplots(figsize=(8, 8))
+    cbar_kws = {"fraction": 0.046, "pad": 0.04}
+    sns.heatmap(corr_soi_surftemp, mask=mask, cmap='coolwarm_r', square=True, vmin=-1, vmax=1, annot=True,
+                cbar_kws=cbar_kws, ax=ax)
+    plt.title("Correlation between annual SOI and annual average surface temperature over different zones (Period 1951-2018)")
+    plt.tight_layout()
+    plt.savefig(os.path.join(outpath, 'ex3_heatmap_SOI_surftemp_detrended.png'), dpi=150)
+
+    #plt.show()
+    pass
+
 
 if __name__ == '__main__':
     # Gets the directory where this python script is located,
@@ -433,9 +494,4 @@ if __name__ == '__main__':
     #    2) similar trend in SOI, SST and Sea level over eastern pacific
     #    3) at the global scale?
     # --------------------------------------------------------------------------
-    task_c(fn_sealevel, fn_temp, fn_soi, outpath)
-
-
-
-
-
+    task_c(fn_sealevel, fn_temp, fn_soi, os.path.join(outpath, 'taskc-SOI-corr'))
